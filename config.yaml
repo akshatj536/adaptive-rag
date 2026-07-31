@@ -1,0 +1,89 @@
+chunking:
+  strategy: recursive
+  child_chunk_size: 512         # tokens
+  child_chunk_overlap: 64       # tokens
+  parent:
+    granularity: page           # page | block | document
+    block_size: 2048            # tokens; used when granularity == block
+    block_overlap: 128          # tokens; used when granularity == block
+    fallback_page_chars: 3000   # synthetic "page" size for .txt / .md
+    max_metadata_chars: 12000   # guard: parent text stored in metadata is truncated here
+
+embeddings:
+  provider: local
+  model: BAAI/bge-small-en-v1.5
+  # bge-* models are asymmetric: queries need this instruction prefix, documents do not.
+  query_prefix: "Represent this sentence for searching relevant passages: "
+  batch_size: 64
+
+vectorstore:
+  provider: chroma
+  path: ./.chroma
+  collection: rag_children
+
+retrieval:
+  top_k: 5
+  fetch_multiplier: 4           # candidates fetched per top_k when rerank is on
+  components:                   # flip to add/remove; no code changes needed
+    vector: true
+    bm25: false                 # sparse BM25, fused with vector via RRF
+    hyde: false                 # rewrite query as a hypothetical answer first
+    rerank: false               # local cross-encoder reorders candidates
+  # Components run in stage order (pre_retrieval -> retrieval -> post_retrieval),
+  # and in the order listed above within a stage. So hyde always runs before
+  # vector/bm25 regardless of where you put it here, and rerank always last.
+  bm25:
+    k1: 1.5
+    b: 0.75
+    rrf_k: 60                   # reciprocal rank fusion constant
+  hyde:
+    role: reasoning             # which llm.<role> drafts the hypothetical answer
+    max_tokens: 256
+  rerank:
+    model: cross-encoder/ms-marco-MiniLM-L-6-v2   # local, no API
+
+generation:
+  max_context_chars: 20000      # total budget across all parent blocks in one prompt
+  # Answer length cap. Note this is RESERVED against a provider's tokens-per-minute
+  # budget even when unused, so prompt + this must fit the *smallest* provider a
+  # role can fall back to (Groq free tier is ~12k TPM). Long answers run ~500
+  # tokens; 2048 leaves headroom without risking a 413 on fallback.
+  max_answer_tokens: 2048
+
+llm:
+  # Fallbacks are chosen for *daily* headroom, not peak quality. Groq's 70B has a
+  # small tokens-per-day budget that a few RAG prompts exhaust; the 8B model has
+  # far more. A fallback that is also capped is not a fallback.
+  routing:
+    provider: groq
+    model: llama-3.1-8b-instant
+    fallback_provider: gemini
+    fallback_model: gemini-3.5-flash-lite
+  reasoning:
+    provider: groq
+    model: llama-3.3-70b-versatile
+    fallback_provider: gemini
+    fallback_model: gemini-3.5-flash
+  # gemini-2.5-flash/-flash-lite are retired for new API keys; 3.x is current.
+  generation:
+    provider: gemini
+    model: gemini-3.6-flash
+    fallback_provider: groq
+    fallback_model: llama-3.1-8b-instant
+  retry: { max_attempts: 5, base_delay_s: 1, fallback: true }
+
+router:
+  enabled: true                 # false = every query goes to default_path, no classifier call
+  default_path: naive           # also the fallback whenever classification fails
+  paths: [naive, agentic]       # agentic is registered in slice 4; until then it
+                                # degrades to default_path and says so
+
+agentic:
+  # Every knob here caps LLM calls. Worst case per query is roughly
+  #   1 plan + max_sub_questions x (1 grade + max_loops x (1 reformulate + 1 grade))
+  #   + 1 synthesis + 1 self-check, times (max_self_checks + 1).
+  max_loops: 3                  # retrieve->grade->reformulate cycles per sub-question
+  max_sub_questions: 4          # hops the planner may create
+  max_self_checks: 1            # times an ungrounded answer may bounce back to the planner
+  enable_decomposition: true
+  enable_self_check: true

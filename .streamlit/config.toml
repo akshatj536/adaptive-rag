@@ -1,0 +1,22 @@
+[server]
+headless = true
+
+# Watcher off, deliberately. Two reasons:
+#
+# 1. Streamlit's source watcher walks sys.modules and touches module.__path__,
+#    which makes transformers lazily import every vision model it ships and
+#    raise ModuleNotFoundError for torchvision (not installed - embeddings are
+#    text-only). That produced ~95 tracebacks per startup. folderWatchBlacklist
+#    does not help: the failure happens while extracting paths, before any
+#    folder filtering is applied.
+#
+# 2. Hot reload is misleading here anyway. @st.cache_resource pins the config
+#    and pipeline objects for the session, so editing src/ reloads the UI code
+#    against stale pipeline objects - which surfaces as confusing AttributeErrors
+#    rather than picking up the change.
+#
+# Restart the app to pick up any change to src/ or config.yaml.
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false

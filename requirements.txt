@@ -1,0 +1,32 @@
+# Core
+pyyaml>=6.0
+python-dotenv>=1.0
+
+# Vector store
+chromadb>=0.5.0
+
+# Local embeddings (CPU, no API)
+# torch must be installed from the CPU index FIRST, or pip pulls the CUDA build
+# and several GB of unused nvidia-* wheels. See README "Setup".
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch
+sentence-transformers>=3.0
+
+# Chunking
+langchain-text-splitters>=0.3
+transformers>=4.40          # tokenizer used for token-accurate child splitting
+
+# Loaders
+pypdf>=4.2
+
+# LLM providers
+groq>=0.11
+google-genai>=1.0
+
+# UI
+streamlit>=1.36
+
+# Sparse retrieval (slice 2)
+rank-bm25>=0.2.2
+
+# Agentic orchestration (slice 4)
+langgraph>=0.2

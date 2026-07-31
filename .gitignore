@@ -1,0 +1,32 @@
+# Secrets — never commit
+.env
+
+# Source documents. Ignored because they're the user's own corpus (and often
+# third-party PDFs). .gitkeep is kept so the folder exists on a fresh clone;
+# scripts/ingest.py errors out if data/ is missing.
+data/*
+!data/.gitkeep
+
+# Generated / rebuildable
+.chroma/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+*.log
+
+# Environments
+.venv/
+venv/
+env/
+
+# Streamlit: config.toml IS committed (it disables the source watcher, without
+# which transformers' lazy imports flood the log). Only secrets are excluded.
+.streamlit/secrets.toml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
