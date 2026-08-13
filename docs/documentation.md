@@ -54,7 +54,7 @@ question and dispatches it. On this repo:
 
 That ratio *is* the project. Everything else exists to make it safe to rely on.
 
-> **On the numbers in this README.** Figures come from running the system against one
+> **On the numbers in this document.** Figures come from running the system against one
 > corpus of 8 documents / 236 chunks. They are indicative observations, not benchmark
 > results — a proper evaluation harness is deliberately [future scope](#future-scope).
 
@@ -462,7 +462,7 @@ app/streamlit_app.py  UI with live route / sub-question / step streaming
 **Evaluation & benchmarking.** Deliberately excluded so far, and the most valuable next
 step. `RagResult` is a uniform contract across both paths, so a harness can wrap
 `stack.run(query)` without touching pipeline code. This is what would turn the
-observations in this README into measurements: recall@k and faithfulness, and most
+observations in this document into measurements: recall@k and faithfulness, and most
 importantly **router accuracy** — how often the cheap path was genuinely sufficient, and
 what a wrong routing decision costs in each direction.
 
