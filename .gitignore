@@ -30,3 +30,6 @@ env/
 Thumbs.db
 .idea/
 *.swp
+
+# Generated eval index (21MB, rebuilt from HuggingFace on demand)
+eval/hotpot_index.json
