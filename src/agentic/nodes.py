@@ -25,6 +25,8 @@ from src.vectorstore.base import Hit
 logger = logging.getLogger(__name__)
 
 # How much of each chunk the grader sees. Grading needs the gist, not the text.
+# Node token caps allow for hidden reasoning tokens: reasoning models consume
+# output budget before emitting text, and a cap set too low returns empty.
 GRADE_SNIPPET_CHARS = 500
 GRADE_MAX_SNIPPETS = 4
 
@@ -139,7 +141,7 @@ class AgenticNodes:
             "reasoning",
             PLANNER_PROMPT.format(max_subs=max(1, self.agentic.max_sub_questions)),
             user,
-            max_tokens=400,
+            max_tokens=1024,
         )
         data = _json(text)
         subs = data.get("sub_questions") if isinstance(data, dict) else None
@@ -195,7 +197,7 @@ class AgenticNodes:
         text, calls = self._ask(
             "reasoning", GRADER_PROMPT,
             f"Question: {sub.text}\n\nExcerpts:\n{_snippets(sub.evidence)}",
-            max_tokens=200,
+            max_tokens=768,
         )
         data = _json(text)
         if isinstance(data, dict) and "sufficient" in data:
@@ -227,7 +229,7 @@ class AgenticNodes:
             "reasoning", REFORMULATE_PROMPT,
             f"Original question: {sub.original}\nCurrent query: {sub.text}\n"
             f"Missing: {sub.gap or 'nothing relevant was found'}",
-            max_tokens=150,
+            max_tokens=640,
         )
         data = _json(text)
         new_query = str(data.get("query", "")).strip() if isinstance(data, dict) else ""
@@ -301,7 +303,7 @@ class AgenticNodes:
         text, calls = self._ask(
             "reasoning", SELF_CHECK_PROMPT,
             f"Answer:\n{state['answer'][:3000]}\n\nSources:\n{_snippets(all_hits, limit=6)}",
-            max_tokens=200,
+            max_tokens=768,
         )
         data = _json(text)
         grounded = bool(data.get("grounded", True)) if isinstance(data, dict) else True
@@ -324,6 +326,9 @@ class AgenticNodes:
             response = self.llm.complete(
                 role, [Message("system", system), Message("user", user)],
                 temperature=0.0, max_tokens=max_tokens,
+                # Bound hidden reasoning: without this a node can spend its
+                # whole token cap deliberating and return nothing.
+                reasoning_effort="low",
             )
             return response.text, 1
         except LLMError as exc:

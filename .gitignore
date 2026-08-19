@@ -33,3 +33,12 @@ Thumbs.db
 
 # Generated eval index (21MB, rebuilt from HuggingFace on demand)
 eval/hotpot_index.json
+
+# Eval corpus + titles: generated from selected_questions.jsonl by
+# eval/build_corpus.py, so the inputs are versioned and the output is not.
+eval/corpus/
+eval/corpus_titles.json
+
+# Run outputs. Kept out while iterating; add the final set deliberately
+# with `git add -f eval/results.jsonl` once the evaluation is complete.
+eval/results.jsonl

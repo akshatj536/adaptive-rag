@@ -39,19 +39,16 @@ class GroqProvider(LLMProvider):
         *,
         temperature: float = 0.0,
         max_tokens: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> LLMResponse:
         import groq
 
         payload = [{"role": m.role, "content": m.content} for m in messages]
+        extra = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
         try:
             # with_raw_response keeps the HTTP headers, which is where the
             # authoritative rate-limit state lives.
-            raw = self.client.chat.completions.with_raw_response.create(
-                model=model,
-                messages=payload,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+            raw = self._create(model, payload, temperature, max_tokens, extra, groq)
         except groq.RateLimitError as exc:
             headers = _headers(getattr(exc, "response", None))
             raise RateLimitError(
@@ -81,6 +78,23 @@ class GroqProvider(LLMProvider):
             headers=headers,
             raw=completion,
         )
+
+
+    def _create(self, model, payload, temperature, max_tokens, extra, groq):
+        """Send the request, retrying once without reasoning_effort if the model
+        rejects it, so an unsupported hint never fails a call."""
+        try:
+            return self.client.chat.completions.with_raw_response.create(
+                model=model, messages=payload, temperature=temperature,
+                max_tokens=max_tokens, **extra,
+            )
+        except groq.APIStatusError as exc:
+            if exc.status_code != 400 or not extra:
+                raise
+            return self.client.chat.completions.with_raw_response.create(
+                model=model, messages=payload, temperature=temperature,
+                max_tokens=max_tokens,
+            )
 
 
 def _headers(response) -> dict[str, str]:

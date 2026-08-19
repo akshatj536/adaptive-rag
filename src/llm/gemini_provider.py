@@ -44,6 +44,7 @@ class GeminiProvider(LLMProvider):
         *,
         temperature: float = 0.0,
         max_tokens: int | None = None,
+        reasoning_effort: str | None = None,   # not supported here; ignored
     ) -> LLMResponse:
         from google.genai import errors, types
 

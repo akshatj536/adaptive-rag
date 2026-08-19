@@ -68,7 +68,12 @@ class QueryClassifier:
                 self._role,
                 [Message("system", SYSTEM_PROMPT), Message("user", query)],
                 temperature=0.0,
-                max_tokens=120,
+                max_tokens=512,
+                # Reasoning models spend output budget on hidden reasoning
+                # before emitting anything, and on harder questions they will
+                # consume the whole cap and return empty. "low" keeps that
+                # bounded; classification does not need deep deliberation.
+                reasoning_effort="low",
             )
         except LLMError as exc:
             logger.warning("classifier unavailable (%s); using default path %r", exc, default)

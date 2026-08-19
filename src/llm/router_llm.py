@@ -41,11 +41,11 @@ _MIN_MAX_TOKENS = 512
 # These are model *names*, not limits - nothing here encodes a quota.
 DEFAULT_FALLBACK_MODELS: dict[str, dict[str, str]] = {
     "groq": {
-        "routing": "llama-3.1-8b-instant",
-        "reasoning": "llama-3.3-70b-versatile",
-        # 8B, not 70B: the 70B daily token budget is small enough that a handful
-        # of RAG prompts exhaust it, which makes it a poor last resort.
-        "generation": "llama-3.1-8b-instant",
+        "routing": "openai/gpt-oss-20b",
+        "reasoning": "openai/gpt-oss-120b",
+        # The small model, not the large one: it has far more daily headroom,
+        # and a fallback that is also capped is not a fallback.
+        "generation": "openai/gpt-oss-20b",
     },
     "gemini": {
         "routing": "gemini-3.5-flash-lite",
@@ -129,6 +129,7 @@ class LLMRouter:
         *,
         temperature: float = 0.0,
         max_tokens: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> LLMResponse:
         role_cfg = self._cfg.role(role)
         targets = self._targets(role, role_cfg)
@@ -143,7 +144,8 @@ class LLMRouter:
                 )
             try:
                 response = self._call_with_retry(
-                    provider_name, model, messages, temperature, max_tokens, attempts
+                    provider_name, model, messages, temperature, max_tokens,
+                    attempts, reasoning_effort,
                 )
             except LLMError:
                 continue
@@ -176,6 +178,7 @@ class LLMRouter:
         temperature: float,
         max_tokens: int | None,
         attempts: list[Attempt],
+        reasoning_effort: str | None = None,
     ) -> LLMResponse:
         quota = self.quota(provider_name)
         if quota.is_blocked():
@@ -192,7 +195,8 @@ class LLMRouter:
         for attempt in range(max_attempts):
             try:
                 response = provider.complete(
-                    messages, model, temperature=temperature, max_tokens=max_tokens
+                    messages, model, temperature=temperature, max_tokens=max_tokens,
+                    reasoning_effort=reasoning_effort,
                 )
             except RateLimitError as exc:
                 delay = exc.retry_after

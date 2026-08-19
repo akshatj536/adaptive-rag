@@ -79,8 +79,11 @@ class LLMProvider(ABC):
         *,
         temperature: float = 0.0,
         max_tokens: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> LLMResponse:
-        ...
+        """reasoning_effort is a hint ("low"/"medium"/"high") for models that
+        spend output budget on hidden reasoning. Providers that do not support
+        it must ignore it rather than fail."""
 
 
 def parse_retry_after(value: str | None) -> float | None:

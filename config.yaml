@@ -54,14 +54,15 @@ llm:
   # Fallbacks are chosen for *daily* headroom, not peak quality. Groq's 70B has a
   # small tokens-per-day budget that a few RAG prompts exhaust; the 8B model has
   # far more. A fallback that is also capped is not a fallback.
+  # Groq retired the Llama family; gpt-oss-* are the current chat models.
   routing:
     provider: groq
-    model: llama-3.1-8b-instant
+    model: openai/gpt-oss-20b
     fallback_provider: gemini
     fallback_model: gemini-3.5-flash-lite
   reasoning:
     provider: groq
-    model: llama-3.3-70b-versatile
+    model: openai/gpt-oss-120b
     fallback_provider: gemini
     fallback_model: gemini-3.5-flash
   # gemini-2.5-flash/-flash-lite are retired for new API keys; 3.x is current.
@@ -69,7 +70,7 @@ llm:
     provider: gemini
     model: gemini-3.6-flash
     fallback_provider: groq
-    fallback_model: llama-3.1-8b-instant
+    fallback_model: openai/gpt-oss-20b
   retry: { max_attempts: 5, base_delay_s: 1, fallback: true }
 
 router:
