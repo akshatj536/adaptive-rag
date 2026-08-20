@@ -42,3 +42,7 @@ eval/corpus_titles.json
 # Run outputs. Kept out while iterating; add the final set deliberately
 # with `git add -f eval/results.jsonl` once the evaluation is complete.
 eval/results.jsonl
+
+# Provider probe outputs (regenerate with the eval scripts)
+eval/available_models.json
+eval/bench_results.json
