@@ -46,3 +46,4 @@ eval/results.jsonl
 # Provider probe outputs (regenerate with the eval scripts)
 eval/available_models.json
 eval/bench_results.json
+eval/results_pre_gateway.jsonl

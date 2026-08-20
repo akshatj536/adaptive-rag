@@ -79,8 +79,10 @@ with st.sidebar:
         st.caption(f"disabled · everything → `{cfg.router.default_path}`")
 
     st.markdown("**Models by role**")
-    for role, rc in cfg.llm.roles.items():
-        st.caption(f"`{role}` → {rc.provider}/{rc.model}")
+    for role, deps in cfg.llm.roles.items():
+        st.caption(f"`{role}` → {deps[0].model}")
+        if len(deps) > 1:
+            st.caption(f"    ↳ {len(deps) - 1} fallback(s)")
 
     st.divider()
     st.caption(

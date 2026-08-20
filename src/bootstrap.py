@@ -24,7 +24,10 @@ from src.vectorstore.chroma_store import build_vector_store
 
 # Third-party libraries that log every HTTP call at INFO and drown our output.
 _NOISY_LOGGERS = ("httpx", "httpcore", "urllib3", "chromadb", "sentence_transformers",
-                  "transformers", "huggingface_hub", "filelock")
+                  "transformers", "huggingface_hub", "filelock",
+                  # litellm logs every call at INFO twice, plus a cost-map
+                  # warning per deployment at startup.
+                  "LiteLLM", "LiteLLM Router", "LiteLLM Proxy", "litellm")
 
 
 def setup_logging(level: int = logging.INFO) -> None:

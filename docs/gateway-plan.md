@@ -192,7 +192,9 @@ Notes:
 1. Re-run `eval/runner.py --paths route` and compare routing decisions against
    the cached run. Large drift means the classifier is behaving differently on
    a new model, not that the gateway is broken - check which model served it.
-2. Re-run `--paths naive`. `contains` should stay near 85.7% / 71.4% by stratum.
+2. Re-run `--paths naive` and compare `contains` per stratum against the
+   cached pre-migration run. A drop of more than a few points means the new
+   generation model is worse, not that the gateway is broken.
 3. Confirm the four call sites are untouched (`git diff --stat` should show no
    changes under `classifier.py`, `nodes.py`, `hyde.py`, `generate.py`).
 

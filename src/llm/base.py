@@ -30,6 +30,7 @@ class LLMResponse:
     # Raw response headers, lowercased. Carries Retry-After and x-ratelimit-*
     # so quota decisions come from the provider, never from constants here.
     headers: dict[str, str] = field(default_factory=dict)
+    cost: float | None = None      # USD for this call, from litellm's cost map
     raw: Any = None
 
     @property

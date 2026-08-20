@@ -92,33 +92,51 @@ class GenerationConfig:
 
 
 @dataclass(frozen=True)
-class RoleConfig:
-    provider: str
+class Deployment:
+    """One place a role can be served from.
+
+    `model` is a LiteLLM model string ("provider/model", sometimes with a
+    nested path like "groq/openai/gpt-oss-120b"). `order` is priority: the
+    router exhausts order 1 before trying order 2, which preserves the
+    primary-then-fallback behaviour while allowing chains deeper than two.
+    """
+
     model: str
-    # Optional explicit fallback. When omitted, router_llm picks the other
-    # provider using its default per-role model map.
-    fallback_provider: str | None = None
-    fallback_model: str | None = None
+    order: int = 1
+
+    @property
+    def provider(self) -> str:
+        return self.model.split("/", 1)[0]
 
 
 @dataclass(frozen=True)
-class RetryConfig:
-    max_attempts: int = 5
-    base_delay_s: float = 1.0
-    fallback: bool = True
+class RouterSettings:
+    """Passed straight to litellm.Router."""
+
+    routing_strategy: str = "simple-shuffle"
+    num_retries: int = 2
+    allowed_fails: int = 2
+    cooldown_time: float = 60.0
+    timeout: float = 60.0
 
 
 @dataclass(frozen=True)
 class LLMConfig:
-    roles: dict[str, RoleConfig] = field(default_factory=dict)
-    retry: RetryConfig = field(default_factory=RetryConfig)
+    roles: dict[str, list[Deployment]] = field(default_factory=dict)
+    router: RouterSettings = field(default_factory=RouterSettings)
+    # Only needed for models missing from litellm's cost map (NIM chat models
+    # have no entries), otherwise reported cost is silently zero.
+    cost_overrides: dict[str, dict] = field(default_factory=dict)
 
-    def role(self, name: str) -> RoleConfig:
+    def role(self, name: str) -> list[Deployment]:
         try:
             return self.roles[name]
         except KeyError:
             known = ", ".join(sorted(self.roles)) or "<none>"
             raise KeyError(f"Unknown LLM role {name!r}. Configured roles: {known}") from None
+
+    def primary(self, name: str) -> Deployment:
+        return self.role(name)[0]
 
 
 @dataclass(frozen=True)
@@ -159,19 +177,21 @@ class Config:
         return p if p.is_absolute() else (self.project_root / p).resolve()
 
 
-_RESERVED_LLM_KEYS = {"retry"}
-
-
 def _build(raw: dict[str, Any]) -> Config:
     chunking_raw = dict(raw.get("chunking") or {})
     parent_raw = dict(chunking_raw.pop("parent", None) or {})
 
     llm_raw = dict(raw.get("llm") or {})
-    retry_raw = dict(llm_raw.pop("retry", None) or {})
+    router_settings = RouterSettings(**(llm_raw.pop("router", None) or {}))
+    cost_overrides = dict(llm_raw.pop("cost_overrides", None) or {})
     roles = {
-        name: RoleConfig(**spec)
-        for name, spec in llm_raw.items()
-        if name not in _RESERVED_LLM_KEYS
+        role: [
+            # Order defaults to list position, so config reads as a priority
+            # list without repeating an explicit order on every entry.
+            Deployment(order=i, **dep) if "order" not in dep else Deployment(**dep)
+            for i, dep in enumerate(deployments, start=1)
+        ]
+        for role, deployments in (llm_raw.pop("roles", None) or {}).items()
     }
 
     retrieval_raw = dict(raw.get("retrieval") or {})
@@ -188,7 +208,8 @@ def _build(raw: dict[str, Any]) -> Config:
         vectorstore=VectorStoreConfig(**(raw.get("vectorstore") or {})),
         retrieval=retrieval,
         generation=GenerationConfig(**(raw.get("generation") or {})),
-        llm=LLMConfig(roles=roles, retry=RetryConfig(**retry_raw)),
+        llm=LLMConfig(roles=roles, router=router_settings,
+                      cost_overrides=cost_overrides),
         router=RouterConfig(**(raw.get("router") or {})),
         agentic=AgenticConfig(**(raw.get("agentic") or {})),
     )

@@ -51,27 +51,46 @@ generation:
   max_answer_tokens: 2048
 
 llm:
-  # Fallbacks are chosen for *daily* headroom, not peak quality. Groq's 70B has a
-  # small tokens-per-day budget that a few RAG prompts exhaust; the 8B model has
-  # far more. A fallback that is also capped is not a fallback.
-  # Groq retired the Llama family; gpt-oss-* are the current chat models.
-  routing:
-    provider: groq
-    model: openai/gpt-oss-20b
-    fallback_provider: gemini
-    fallback_model: gemini-3.5-flash-lite
-  reasoning:
-    provider: groq
-    model: openai/gpt-oss-120b
-    fallback_provider: gemini
-    fallback_model: gemini-3.5-flash
-  # gemini-2.5-flash/-flash-lite are retired for new API keys; 3.x is current.
-  generation:
-    provider: gemini
-    model: gemini-3.6-flash
-    fallback_provider: groq
-    fallback_model: openai/gpt-oss-20b
-  retry: { max_attempts: 5, base_delay_s: 1, fallback: true }
+  # Deployments are a priority list: order 1 is tried first, then order 2, etc.
+  # Chosen from measured latency, see docs/providers.md. Fallbacks deliberately
+  # span providers so one provider's outage never stalls a role.
+  roles:
+    # Runs on every query, so latency dominates. Non-reasoning instruct models
+    # only: reasoning models spend 200+ hidden tokens on a one-line answer.
+    routing:
+      - model: mistral/ministral-8b-latest              # 0.56s, 27 out tokens
+      - model: cohere/command-r7b-12-2024               # 0.92s, cheap
+      - model: nvidia_nim/meta/llama-3.1-8b-instruct    # 0.54s, 16 out tokens
+      - model: groq/openai/gpt-oss-20b                  # 0.80s, 217 reasoning
+
+    # Planning, grading, reformulation. Quality here decides how many agentic
+    # loops get spent, so some reasoning is worth paying for.
+    reasoning:
+      - model: groq/openai/gpt-oss-120b                 # 0.69s, 71 reasoning
+      - model: mistral/mistral-small-latest
+      - model: gemini/gemini-3.5-flash-lite
+
+    # Sees RAG-sized prompts. gemini-3.6-flash took 8.74s on those versus ~1s
+    # here, and generation runs on every query.
+    generation:
+      - model: mistral/mistral-small-latest             # 0.97s on 5k tokens
+      - model: gemini/gemini-3.5-flash-lite             # 1.12s
+      - model: groq/openai/gpt-oss-20b                  # 0.86s
+      - model: cohere/command-r7b-12-2024               # 1.32s
+
+  router:
+    routing_strategy: simple-shuffle   # respects order; latency-based-routing ignores it
+    num_retries: 2
+    allowed_fails: 2
+    cooldown_time: 60
+    timeout: 60
+
+  # litellm has no cost data for NIM chat models (3 entries, all rerankers),
+  # so without these the reported cost is silently zero.
+  cost_overrides:
+    nvidia_nim/meta/llama-3.1-8b-instruct:
+      input_cost_per_token: 0.0
+      output_cost_per_token: 0.0
 
 router:
   enabled: true                 # false = every query goes to default_path, no classifier call
